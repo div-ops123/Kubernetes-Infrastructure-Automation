@@ -1,0 +1,1 @@
+# Provision EC2 instances (no user data—Ansible handles config).
