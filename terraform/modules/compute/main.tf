@@ -8,22 +8,29 @@ resource "aws_key_pair" "note-app" {
   public_key = file("${path.module}/key-pair/note-app-key.pub")
 }
 
-# Ubuntu EC2 instance for master node using AMI lookup
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
-  }
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-  owners = ["099720109477"] # Canonical
+# This uses AWS Systems Manager to get Canonical’s latest stable 24.04 AMI
+data "aws_ssm_parameter" "ubuntu_ami" {
+  name = "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
 }
 
+# Ubuntu EC2 instance for master node using AMI lookup
+# data "aws_ami" "ubuntu" {
+#   most_recent = true
+#   filter {
+#     name   = "name"
+#     values = ["ubuntu/images/hvm-ssd/ubuntu-noble-24.04-amd64-server-*"]
+#     # values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+#   }
+#   filter {
+#     name   = "virtualization-type"
+#     values = ["hvm"]
+#   }
+#   owners = ["099720109477"] # Canonical
+# }
+
 resource "aws_instance" "master-node" {
-  ami           = data.aws_ami.ubuntu.id
+  # ami           = data.aws_ami.ubuntu.id
+  ami           = data.aws_ssm_parameter.ubuntu_ami.value   # .value gives the AMI ID string
   instance_type = "t3.medium"
   subnet_id     = var.private_subnet_ids[0] # First Private subnet.
   vpc_security_group_ids = [ var.k8s_nodes_sg_id ]
@@ -42,7 +49,7 @@ resource "aws_instance" "master-node" {
 # Launch Template: Defines worker node config
 resource "aws_launch_template" "worker-node" {
   name_prefix   = "note-app-worker-node-"
-  image_id      = data.aws_ami.ubuntu.id
+  image_id      = data.aws_ssm_parameter.ubuntu_ami.value
   instance_type = "t3.medium"
   key_name      = aws_key_pair.note-app.key_name
   vpc_security_group_ids = [ var.k8s_nodes_sg_id ]  # Get from vpc module

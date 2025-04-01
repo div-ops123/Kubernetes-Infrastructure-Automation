@@ -147,9 +147,19 @@ The nodes have their communication routes via the `route tables`:
 - **Nodes → Internet**: Not yet—private route table lacks 0.0.0.0/0 → nat-<id> (no NAT Gateway), so no outbound internet access (we’ll add this later if needed for Docker pulls).
 
 ---
+Terraform Taint:
+`terraform taint module.compute.aws_autoscaling_group.workers` → Marks ASG for recreation.
+terraform apply → Rebuilds ASG and instances.
+
+
+Next Steps:
+
 Ansible Setup:
-Use master_private_ip and worker_private_ips to populate ansible/inventory.yml.
-Write install-k8s.yml to install Kubernetes dependencies.
+Containerize App
+k8s deployment
+cicd
+
+Graceful shutdown.txt
 ---
 
 ### Workflow Steps
