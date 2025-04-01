@@ -7,7 +7,7 @@
 
 **Components**:
 - **Infrastructure (Terraform)**:
-  - VPC, subnets, security groups
+  - VPC, Subnets, Security Groups, Internet Gateway (IGW), Route Tables
   - EC2 instances for Kubernetes nodes
   - Auto Scaling Group (ASG) for worker nodes
   - Application Load Balancer (ALB)

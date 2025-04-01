@@ -38,3 +38,14 @@ output "private_route_table_id" {
   description = "Private Route Table ID"
   value       = module.vpc.private_route_table_id
 }
+
+output "master_private_ip" {
+  description = "Private IP of the master node"
+  value       = module.compute.master_private_ip
+}
+
+# ASK Grok if you can manually stop the instances in the console then running terraform apply would it change it back?
+# output "worker_instance_ids" {
+#   description = "IDs of worker instances"
+#   value       = module.compute.worker_instance_ids
+# }

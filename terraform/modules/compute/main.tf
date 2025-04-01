@@ -1,1 +1,70 @@
-# Provision EC2 instances (no user data—Ansible handles config).
+# Provision EC2 instances in the private subnets to form a Kubernetes cluster
+
+# key-pair for the ec2 instances for ssh access
+# Generate SSH key locally, e.g., ssh-keygen -f note-app-key
+# Then store them in a key-pair folder
+resource "aws_key_pair" "note-app" {
+  key_name   = "note-app-key"
+  public_key = file("${path.module}/key-pair/note-app-key.pub")
+}
+
+# Ubuntu EC2 instance for master node using AMI lookup
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+  owners = ["099720109477"] # Canonical
+}
+
+# Does my nodes have a static IP?
+resource "aws_instance" "master-node" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t3.medium"
+  subnet_id     = var.private_subnet_ids[0] # First Private subnet.
+  vpc_security_group_ids = [ var.k8s_nodes_sg_id ]
+  key_name      = aws_key_pair.note-app.key_name
+  associate_public_ip_address = false       # Private Subnet, no public IP needed yet; Ansible can use a bastion or NAT later if required
+
+  tags = merge(var.common_tags, {Name = "master-node"})
+}
+
+# Create aws_launch_template + aws_autoscaling_group "worker-node" (2-4 instances, private subnets).
+# Launch Template: Defines worker node config
+resource "aws_launch_template" "worker-node" {
+  name_prefix   = "note-app-worker-node-"
+  image_id      = data.aws_ami.ubuntu.id
+  instance_type = "t3.medium"
+  key_name      = aws_key_pair.note-app.key_name
+  vpc_security_group_ids = [ var.k8s_nodes_sg_id ]  # Get from vpc module
+
+  tag_specifications {
+    resource_type = "instance"
+    tags          = merge(var.common_tags, {Name = "worker-node"})
+  }
+}
+
+# ASG: Manages 2-4 worker instances across private subnets
+resource "aws_autoscaling_group" "workers" {
+  name                 = "note-app-workers"
+  desired_capacity     = 2
+  max_size             = 4
+  min_size             = 2
+  vpc_zone_identifier = var.private_subnet_ids    # All private subnets
+
+  launch_template {
+    id      = aws_launch_template.worker-node.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "worker-node"
+    propagate_at_launch = true
+  }
+}
