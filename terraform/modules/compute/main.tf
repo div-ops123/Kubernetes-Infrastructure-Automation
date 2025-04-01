@@ -22,7 +22,6 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"] # Canonical
 }
 
-# Does my nodes have a static IP?
 resource "aws_instance" "master-node" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = "t3.medium"
@@ -50,7 +49,12 @@ resource "aws_launch_template" "worker-node" {
 
   tag_specifications {
     resource_type = "instance"
-    tags          = merge(var.common_tags, {Name = "worker-node"})
+    tags          = merge(var.common_tags, 
+      {
+        Name = "worker-node"
+        KubernetesRole = "worker"
+      }
+    )
   }
 }
 

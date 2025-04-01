@@ -140,11 +140,16 @@ CI/CD (Jenkins + Harness)
 
 ---
 **Communication**:
+
 The nodes have their communication routes via the `route tables`:
 - **Master ↔ Workers**: Both in private subnets, use 10.0.0.0/16 → local to talk internally (e.g., API on 6443, pod traffic).
 - **ALB → Nodes**: ALB in public subnets (via IGW) sends traffic to nodes in private subnets (via Security Group rules, e.g., NodePort range).
 - **Nodes → Internet**: Not yet—private route table lacks 0.0.0.0/0 → nat-<id> (no NAT Gateway), so no outbound internet access (we’ll add this later if needed for Docker pulls).
 
+---
+Ansible Setup:
+Use master_private_ip and worker_private_ips to populate ansible/inventory.yml.
+Write install-k8s.yml to install Kubernetes dependencies.
 ---
 
 ### Workflow Steps
