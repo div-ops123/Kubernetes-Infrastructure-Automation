@@ -1,6 +1,6 @@
 output "vpc_id" {
   description = "ID of the created VPC"
-  value = aws_vpc.note-app-vpc.id
+  value = aws_vpc.vpc.id
 }
 
 # aws_subnet.note-app-public-subnets is a list of subnet resources, and [*].id extracts their id attributes into a list of strings.
