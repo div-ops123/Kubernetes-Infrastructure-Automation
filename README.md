@@ -118,7 +118,6 @@ Following best practices:
 
 `terraform/`
 - It can assign static private IPs to avoid changes when restarting.
-🔹 If you stop & start VMs, the IPs remain the same, and the cluster continues to work.
 - Output public IPs for Ansible inventory.
 
 
@@ -140,12 +139,11 @@ CI/CD (Jenkins + Harness)
   - Start with manual `kubectl` deployment, then automate with Jenkins/Harness.
 
 ---
-
-### Next Steps
-- **Start Small**: Focus on `terraform/` first—update `compute` module for EC2 instances.
-modules/networking/main.tf
-- **Then**: Move to `ansible/` for Kubernetes setup.
-- **Later**: Tackle `kubernetes/` and CI/CD.
+**Communication**:
+The nodes have their communication routes via the `route tables`:
+- **Master ↔ Workers**: Both in private subnets, use 10.0.0.0/16 → local to talk internally (e.g., API on 6443, pod traffic).
+- **ALB → Nodes**: ALB in public subnets (via IGW) sends traffic to nodes in private subnets (via Security Group rules, e.g., NodePort range).
+- **Nodes → Internet**: Not yet—private route table lacks 0.0.0.0/0 → nat-<id> (no NAT Gateway), so no outbound internet access (we’ll add this later if needed for Docker pulls).
 
 ---
 

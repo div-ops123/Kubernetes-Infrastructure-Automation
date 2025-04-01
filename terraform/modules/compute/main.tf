@@ -34,7 +34,12 @@ resource "aws_instance" "master-node" {
   tags = merge(var.common_tags, {Name = "master-node"})
 }
 
+##################################
 # Create aws_launch_template + aws_autoscaling_group "worker-node" (2-4 instances, private subnets).
+# aws_launch_template +d aws_autoscaling_group (ASG) automatically launched the worker instances.
+# The ASG uses the launch template to create instances based on the desired_capacity (set to 2 in your case). 
+# It manages the lifecycle of those instances (launching, terminating, scaling) automatically.
+##################################
 # Launch Template: Defines worker node config
 resource "aws_launch_template" "worker-node" {
   name_prefix   = "note-app-worker-node-"
@@ -50,6 +55,7 @@ resource "aws_launch_template" "worker-node" {
 }
 
 # ASG: Manages 2-4 worker instances across private subnets
+# Ensure ASG tags propagate(spread widely) to Instances
 resource "aws_autoscaling_group" "workers" {
   name                 = "note-app-workers"
   desired_capacity     = 2
@@ -65,6 +71,11 @@ resource "aws_autoscaling_group" "workers" {
   tag {
     key                 = "Name"
     value               = "worker-node"
+    propagate_at_launch = true
+  }
+  tag {
+    key                 = "KubernetesRole"
+    value               = "worker"
     propagate_at_launch = true
   }
 }
