@@ -2,5 +2,4 @@
 *.tfstate
 *.tfstate.backup
 terraform.tfvars
-/terraform/copilot-instructions.md
-/terraform/modules/compute/key-pair/
+terraform/modules/compute/key-pair/
