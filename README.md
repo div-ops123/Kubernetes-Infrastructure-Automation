@@ -77,7 +77,8 @@ Following best practices:
 
 #### Prerequisites
 
-### aws, aws cli, and terraform installed and set up
+### Prerequisites
+aws, aws cli, terraform, ansible, python installed and set up
 
 #### Deployment Guide
 
@@ -110,7 +111,8 @@ Following best practices:
 - The main project then uses these resources to store its state remotely, with DynamoDB providing state locking to prevent concurrent modifications.
 
 
-## B. 
+## B. Change the path in
+- ansilbe_ssh_private_key_file
 
 `application-code/`
 - Test locally: `docker build -t note-app . && docker run -p 3000:3000 note-app`.

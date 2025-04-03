@@ -2,10 +2,10 @@
 
 # key-pair for the ec2 instances for ssh access
 # Generate SSH key locally, e.g., ssh-keygen -f note-app-key
-# Then store them in a key-pair folder
+# Place it in your home_dir/.ssh folder
 resource "aws_key_pair" "note-app" {
   key_name   = "note-app-key"
-  public_key = file("${path.module}/key-pair/note-app-key.pub")
+  public_key = file("${var.home_dir}/.ssh/note-app-key.pub")
 }
 
 # This uses AWS Systems Manager to get Canonical’s latest stable 24.04 AMI

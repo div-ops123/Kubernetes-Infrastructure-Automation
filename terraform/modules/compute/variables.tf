@@ -16,3 +16,9 @@ variable "k8s_nodes_sg_id" {
   description = "Security group ID for Kubernetes nodes"
   type        = string
 }
+
+variable "home_dir" {
+  description = "Home directory"
+  type        = string
+  default     = "/home/ec2-user"
+}
