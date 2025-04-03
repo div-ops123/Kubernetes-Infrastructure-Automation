@@ -1,0 +1,27 @@
+# Purpose: Lists your master and worker nodes for Ansible to target.
+
+# Defines groups of hosts (master and workers) for Ansible to manage
+all:
+  hosts:
+    master:
+      ansible_host: 10.0.1.24 # Master node private IP from Terraform
+    worker1:
+      ansible_host: 10.0.2.109 # Worker1 node private IP from Terraform
+    worker2:
+      ansible_host: 10.0.1.139 # Worker2 node private IP from Terraform
+  vars:
+    ansible_user: ubuntu    # Default user for Ubuntu AMI
+    ansilbe_ssh_private_key_file: ../terraform/modules/compute/key-pair/note-app-key    # Path to your SSH private key.
+  children:
+    k8s_nodes:              # Group for all Kubernetes nodes
+      hosts:
+        master:
+        worker1:
+        worker2:
+      k8s_master:           # Group for master node
+        hosts:
+          master:
+      k8s_workers:          # Group for master node
+        hosts:
+          worker1:
+          worker2:

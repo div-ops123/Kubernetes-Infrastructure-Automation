@@ -1,0 +1,59 @@
+# Purpose: Initializes the master node and joins workers to the cluster.
+
+---
+- name: Initialize the cluster
+  hosts: k8s_master               # Run only on master node
+  become: yes                     # Runs as root
+  tasks:
+    # Initialize the Kubernetes cluster on the master with kubeadm
+    - name: Initialize Kubernetes cluster
+      command: sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+      register: kubeadm_init      # Stores output for later use
+      changed_when: kubeadm_init.rc == 0 # Marks as changed if successful
+
+    # Set up kubeconfig for the user
+    - name: Create .kube directory
+      file:
+        path: /home/{{ ansible_user }}/.kube
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Copy admin.conf to user's kubeconfig
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/{{ ansible_user }}/.kube/config
+        remote_src: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+
+    # Install Flannel network plugin, enabling pod-to-pod communication.
+    - name: Install Flannel
+      command: kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+      environment:
+        KUBECONFIG: /home/{{ ansible_user }}/.kube/config # ensure kubectl uses the correct configuration.
+
+    # Retrieve the join command for worker nodes
+    - name: Get join command
+      shell: kubeadm token create --print-join-command    # Generate the join command
+      register: join_command                              # Stores it(generated join command) in the `join_command` variable
+      changed_when: false
+
+    # Saves the join command to a file on your local machine (/tmp/k8s_join_command.sh)
+    - name: Save join command to local file
+      local_action:
+        module: copy
+        content: "{{ join_command.stdout }}"
+        dest: /tmp/k8s_join_command.sh  # Saves it(generated join command) locally to /tmp/k8s_join_command.sh
+      delegate_to: localhost            # Run the task on your local machine (the control node running Ansible), not the remote k8s_master node
+
+- name: Join workers to the cluster
+  hosts: k8s_workers             # Targets only worker nodes
+  become: yes                    # Runs as root
+  tasks:
+    # Join worker nodes using the join command from master
+    - name: Join worker to the cluster
+      command: "{{ hostvars['k8s_master']['join_command'].stdout }}"
+      when: hostvars['k8s_master']['join_command'] is defined

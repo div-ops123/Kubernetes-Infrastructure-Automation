@@ -1,0 +1,119 @@
+# Installs Prerequisites and Kubernetes Dependencies on all nodes
+
+---
+- name: Install Kubernetes prerequisites and components
+  hosts: k8s_nodes              # Targets all nodes (master + workers)
+  become: yes                   # Runs tasks as root (sudo)
+  tasks:
+    # Update package cache to ensure we get the latest packages
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+      changed_when: false       # Avoids marking this as "changed" every time
+
+    # Install required packages for Docker and Kubernetes
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - apt-transport-https
+          - curl
+          - containerd
+        state: present          # Ensures these packages are installed
+
+    # Configure containerd
+    - name: Create containerd config directory
+      file:
+        path: /etc/containerd
+        state: directory
+        mode: '0755'
+
+    - name: Generate default containerd config
+      command: containerd config default
+      register: containerd_config
+      changed_when: false
+
+    - name: Write containerd config to file
+      copy:
+        content: "{{ containerd_config.stdout }}"
+        dest: /etc/containerd/config.toml
+        mode: '0644'
+      notify: Restart containerd
+
+    - name: Enable SystemdCgroup in containerd config
+      lineinfile:
+        path: /etc/containerd/config.toml
+        regexp: '^(\s*SystemdCgroup\s*=\s*)false'
+        line: '\1true'
+        backrefs: yes
+      notify: Restart containerd
+
+    # Install Kubernetes components
+    - name: Add Kubernetes apt key
+      shell: curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg  # Only runs if file doesn’t exist
+
+    - name: Add Kubernetes apt repository
+      lineinfile:
+        path: /etc/apt/sources.list.d/kubernetes.list
+        line: 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /'
+        create: yes
+        mode: '0644'
+
+    - name: Update apt cache after adding Kubernetes repo
+      apt:
+        update_cache: yes
+
+    - name: Install Kubernetes components
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+
+    - name: Hold Kubernetes packages at current version
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    # Disable swap
+    - name: Disable swap
+      command: swapoff -a
+      when: ansible_swaptotal_mb > 0  # Only run if swap exists
+
+    # Remove swap entry from /etc/fstab to persist across reboots
+    - name: Remove swap from fstab
+      lineinfile:
+        path: /etc/fstab
+        regexp: '^.*swap.*$'
+        state: absent
+
+    # Load necessary kernel modules
+    - name: Load overlay kernel module
+      modprobe:
+        name: overlay
+        state: present
+
+    - name: Load br_netfilter kernel module
+      modprobe:
+        name: br_netfilter
+        state: present
+
+    # Set required sysctl parameters
+    - name: Create k8s sysctl config file
+      ofstream     copy:
+        content: |
+          net.bridge.bridge-nf-call-iptables  = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward                 = 1
+        dest: /etc/sysctl.d/k8s.conf
+        mode: '0644'
+
+    - name: Apply sysctl settings
+      command: sysctl --system
+      changed_when: false

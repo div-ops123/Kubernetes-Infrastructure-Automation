@@ -154,7 +154,17 @@ terraform apply → Rebuilds ASG and instances.
 
 Next Steps:
 
-Ansible Setup:
+Ansible Setup
+Steps:
+Define inventory with EC2 IPs from Terraform outputs.
+Install prerequisites and Kubernetes components on all nodes.
+Initialize the master and join workers to the cluster.
+
+Automate the Process. Grok query - Step 2: Fetch Terraform Outputs
+- Dynamically fetch the private IP addresses of your nodes from Terraform outputs and use them in your Ansible inventory.
+- Add a step in your workflow (e.g., a shell script) to regenerate terraform_outputs.json after terraform apply.
+
+
 Containerize App
 k8s deployment
 cicd
