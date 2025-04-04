@@ -214,12 +214,12 @@ resource "aws_security_group_rule" "control-node-ingress" {
 
 resource "aws_security_group_rule" "control-node-egress" {
   type              = "egress"       
-  description       = "Allow SSH to the K8s nodes in the private subnet."
-  from_port         = 22
-  to_port           = 22
-  protocol          = "tcp"
+  description       = "Allow control-node to reach any IP on the internet"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
   security_group_id = aws_security_group.control-node-sg.id  # Source - Rule is attached to the Control Node’s security group.
-  source_security_group_id = aws_security_group.k8s-nodes-sg.id # Destination - Where to send traffic to.
+  cidr_blocks       = ["0.0.0.0/0"]                          # Destination - Send traffic to anywhere in and out of VPC
 }
 
 # Kubernetes nodes can receive traffic from 
