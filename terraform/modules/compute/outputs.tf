@@ -5,15 +5,10 @@ output "master_private_ip" {
   value       = aws_instance.master-node.private_ip
 }
 
-# Add Data Source to fetch worker instances by tag
+# Data Source to fetch worker instances by tag
 data "aws_instances" "workers" {
   instance_tags = { KubernetesRole = "worker"}
   depends_on = [ aws_autoscaling_group.workers ]  # Ensures ASG creates instances first
-}
-
-output "worker_instance_ids" {
-  description = "IDs of worker instances"
-  value       = data.aws_instances.workers.ids
 }
 
 output "worker_instance_ips" {

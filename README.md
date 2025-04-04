@@ -5,6 +5,9 @@
 
 **Goal**: Provision a scalable, containerized note-taking app on Kubernetes, deployed on EC2 instances using Terraform for infrastructure, Ansible for configuration management, and a CI/CD pipeline (Jenkins + Harness) for automation, using Terraform modules for networking and compute, and remote state in S3/DynamoDB.
 
+## Kubernetes & Ansible:
+One Control Node, One Master Node, and a Highly Available Worker Node setup across Two AZs.
+
 **Components**:
 - **Infrastructure (Terraform)**:
   - VPC, Subnets, Security Groups, Internet Gateway (IGW), Route Tables
@@ -113,6 +116,7 @@ aws, aws cli, terraform, ansible, python installed and set up
 
 ## B. Change the path in
 - ansilbe_ssh_private_key_file
+- ~/.ssh/config   - change the private ips of k8s nodes to your output from terraform. Get the private IPs from your Terraform outputs (e.g bash: terraform output worker_instance_ips in the terraform/ directory).
 
 `application-code/`
 - Test locally: `docker build -t note-app . && docker run -p 3000:3000 note-app`.
@@ -171,12 +175,19 @@ Containerize App
 k8s deployment
 cicd
 
-Graceful shutdown.txt
+--- 
+- Graceful shutdown.txt
+
+- GPT query:
+🔹 Steps to Enable SSH from Control Node to Kubernetes Nodes
+
+2️⃣ Configure Ansible to Use the Control Node as a Bastion Host
+
 ---
 
 ### Workflow Steps
 1. **Terraform**:
-   - Provision VPC, subnets, and 3 EC2 instances (1 master, 2 workers).
+   - Provision VPC, subnets, 
    - Output IPs for Ansible.
 2. **Ansible**:
    - Run `install-k8s.yml` to install Kubernetes.

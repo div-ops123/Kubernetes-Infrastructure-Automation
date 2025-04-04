@@ -1,4 +1,5 @@
 # Provision EC2 instances in the private subnets to form a Kubernetes cluster
+# Provision 1 EC2 instance in a public subnet for Ansible Control Node to Manage the Kubernetes Nodes
 
 # key-pair for the ec2 instances for ssh access
 # Generate SSH key locally, e.g., ssh-keygen -f note-app-key
@@ -28,14 +29,26 @@ data "aws_ssm_parameter" "ubuntu_ami" {
 #   owners = ["099720109477"] # Canonical
 # }
 
+# Control node: Acts as a `bastion host` for Ansible to access private nodes.
+resource "aws_instance" "control-node" {
+  ami           = data.aws_ssm_parameter.ubuntu_ami.value   # .value gives the AMI ID string
+  instance_type = "t3.medium"
+  subnet_id     = var.public_subnet_ids[0]                  # AZ-1 first public subnet.
+  vpc_security_group_ids = [ var.control_node_sg_id ]
+  key_name      = aws_key_pair.note-app.key_name
+  associate_public_ip_address = true                        # Since it’s in a public subnet
+  
+  tags = merge(var.common_tags, {Name = "control-node"})
+}
+
 resource "aws_instance" "master-node" {
   # ami           = data.aws_ami.ubuntu.id
   ami           = data.aws_ssm_parameter.ubuntu_ami.value   # .value gives the AMI ID string
   instance_type = "t3.medium"
-  subnet_id     = var.private_subnet_ids[0] # First Private subnet.
+  subnet_id     = var.private_subnet_ids[0]                 # AZ-1 first private subnet
   vpc_security_group_ids = [ var.k8s_nodes_sg_id ]
   key_name      = aws_key_pair.note-app.key_name
-  associate_public_ip_address = false       # Private Subnet, no public IP needed yet; Ansible can use a bastion or NAT later if required
+  associate_public_ip_address = false                       # Private Subnet, no public IP needed yet; Ansible can use a bastion or NAT later if required
 
   tags = merge(var.common_tags, {Name = "master-node"})
 }
@@ -72,7 +85,7 @@ resource "aws_autoscaling_group" "workers" {
   desired_capacity     = 2
   max_size             = 4
   min_size             = 2
-  vpc_zone_identifier = var.private_subnet_ids    # All private subnets
+  vpc_zone_identifier = var.private_subnet_ids    # Distributes instances across both AZs
 
   launch_template {
     id      = aws_launch_template.worker-node.id

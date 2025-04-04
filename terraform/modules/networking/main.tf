@@ -127,34 +127,51 @@ resource "aws_security_group" "k8s-nodes-sg" {
   tags = merge(var.common_tags, {"Name" = "note-app-k8s-nodes-sg"})
 }
 
+# Control Node SG:
+resource "aws_security_group" "control-node-sg" {
+  name        = "note-app-control-node-sg"
+  description = "Security group for Control node"
+  vpc_id      = aws_vpc.vpc.id
+
+  tags = merge(var.common_tags, {"Name" = "note-app-control-node-sg"})
+}
+
+
 # If you have multiple local values, create locals.tf for better organization.
 locals {
-  ingress_rules = {
-    k8s_nodes_from_alb = {
-      from_port   = 30000 # NodePort services
+  ingress_rules = {         # Inbound traffic allowed into k8s sg
+    # format: to_from_resource
+    k8s_nodes_from_alb = {  # to k8s nodes : from alb sg
+      from_port   = 30000   # NodePort services
       to_port     = 32767
       protocol    = "tcp"
       source_sg   = aws_security_group.alb-sg.id
     },
-    k8s_nodes_api = {
+    k8s_nodes_from_control_node = { # To k8s nodes : From control node sg
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      source_sg   = aws_security_group.control-node-sg.id
+    },
+    k8s_nodes_api = {        # To k8s nodes : From self
       from_port   = 6443
       to_port     = 6443
       protocol    = "tcp"
       source_sg   = aws_security_group.k8s-nodes-sg.id
     },
-    k8s_nodes_etcd = {
+    k8s_nodes_etcd = {        # To k8s nodes : From self
       from_port   = 2379
       to_port     = 2380
       protocol    = "tcp"
       source_sg   = aws_security_group.k8s-nodes-sg.id
     },
-    k8s_nodes_kubelet = {
+    k8s_nodes_kubelet = {      # To k8s nodes : From self
       from_port   = 10250
       to_port     = 10252
       protocol    = "tcp"
       source_sg   = aws_security_group.k8s-nodes-sg.id
     },
-    k8s_nodes_all = {
+    k8s_nodes_all = {         # To k8s nodes : From self
       from_port   = 0
       to_port     = 65535
       protocol    = "tcp"
@@ -184,16 +201,37 @@ resource "aws_security_group_rule" "alb-egress" {
   source_security_group_id = aws_security_group.k8s-nodes-sg.id # Destination - Where to send traffic to.
 }
 
+# Cotrol node SG
+resource "aws_security_group_rule" "control-node-ingress" {
+  type              = "ingress"                   # Direction - Inbound
+  description       = "Allow SSH from anywhere"
+  from_port         = 22                        
+  to_port           = 22
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]                # Destination - Allows inbound traffic from anywhere (inside or outside the VPC).
+  security_group_id = aws_security_group.control-node-sg.id # Source - Rule is attached to Control node's sg.
+}
+
+resource "aws_security_group_rule" "control-node-egress" {
+  type              = "egress"       
+  description       = "Allow SSH to the K8s nodes in the private subnet."
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  security_group_id = aws_security_group.control-node-sg.id  # Source - Rule is attached to the Control Node’s security group.
+  source_security_group_id = aws_security_group.k8s-nodes-sg.id # Destination - Where to send traffic to.
+}
+
 # Kubernetes nodes can receive traffic from 
 resource "aws_security_group_rule" "k8s-nodes-ingress" {
   for_each          = local.ingress_rules     # Uses for_each to create multiple security group rules dynamically.
 
   type              = "ingress"
-  description       = "HTTP ingress"
+  description       = "Ingress rule for k8s nodes"
   from_port         = each.value.from_port
   to_port           = each.value.to_port
   protocol          = each.value.protocol
-  source_security_group_id = each.value.source_sg         # Destination - Where to send traffic to.
+  source_security_group_id = each.value.source_sg         # Destination - Allows inbound traffic from source_sg to k8s nodes
   security_group_id = aws_security_group.k8s-nodes-sg.id  # Source - Rule is attached to k8s nodes's sg.
 }
 
