@@ -12,7 +12,7 @@ all:
 
   vars:
     ansible_user: ubuntu    # Default user for Ubuntu AMI
-    ansilbe_ssh_private_key_file: /home/ec2-user/.ssh/note-app-key.pem    # Path to your SSH private key.
+    ansible_ssh_private_key_file: /home/ubuntu/.ssh/note-app-key    # Path to your SSH private key
 
   children:
     k8s_nodes:              # Group for all Kubernetes nodes
@@ -20,10 +20,10 @@ all:
         master:
         worker1:
         worker2:
-      k8s_master:           # Group for master node
-        hosts:
-          master:
-      k8s_workers:          # Group for master node
-        hosts:
-          worker1:
-          worker2:
+    k8s_master:           # Group for master node
+      hosts:
+        master:
+    k8s_workers:          # Group for worker nodea
+      hosts:
+        worker1:
+        worker2:

@@ -35,7 +35,7 @@ resource "aws_instance" "control-node" {
   instance_type = "t3.medium"
   subnet_id     = var.public_subnet_ids[0]                  # AZ-1 first public subnet.
   vpc_security_group_ids = [ var.control_node_sg_id ]
-  key_name      = aws_key_pair.note-app.key_name
+  key_name      = aws_key_pair.note-app.key_name            # public key (note-app-key.pub) is automatically added to /home/ubuntu/.ssh/authorized_keys
   associate_public_ip_address = true                        # Since it’s in a public subnet
   
   tags = merge(var.common_tags, {Name = "control-node"})
@@ -47,7 +47,7 @@ resource "aws_instance" "master-node" {
   instance_type = "t3.medium"
   subnet_id     = var.private_subnet_ids[0]                 # AZ-1 first private subnet
   vpc_security_group_ids = [ var.k8s_nodes_sg_id ]
-  key_name      = aws_key_pair.note-app.key_name
+  key_name      = aws_key_pair.note-app.key_name            # public key (note-app-key.pub) is automatically added to /home/ubuntu/.ssh/authorized_keys
   associate_public_ip_address = false                       # Private Subnet, no public IP needed yet; Ansible can use a bastion or NAT later if required
 
   tags = merge(var.common_tags, {Name = "master-node"})

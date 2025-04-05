@@ -82,6 +82,7 @@ Following best practices:
 
 ### Prerequisites
 aws, aws cli, terraform, ansible, python installed and set up
+3. Ansible installed (e.g via `pip3 install ansible --user`)
 
 #### Deployment Guide
 
@@ -118,13 +119,35 @@ aws, aws cli, terraform, ansible, python installed and set up
 - ansilbe_ssh_private_key_file
 - ~/.ssh/config   - change the private ips of k8s nodes to your output from terraform. Get the private IPs from your Terraform outputs (e.g bash: terraform output worker_instance_ips in the terraform/ directory).
 
+## C. Enable SSH from Control Node to Kubernetes Nodes
+
+### Copy the Private Key to the Control Node:
+Since the Kubernetes nodes uses `note-app-key.pub`, you need the matching private key (`note-app-key`) on the control node to SSH into them.
+
+1. **Step 1**: Locate the Private Key on the machine where you ran `ssh-keygen` e.g VM1
+
+2. **Step 2**: Copy the Private Key to the Control Node
+From VM1, SCP the private key to the control node:
+
+- Since `note-app-key` is the private key that matches control-node’s public key (from the AWS key pair), use it directly in the scp command from VM1. Example:
+
+```bash
+scp -i /home/ec2-user/.ssh/note-app-key /home/ec2-user/.ssh/note-app-key ubuntu@<public-ip>:/home/ubuntu/.ssh/note-app-key
+```
+
+- **-i /home/ec2-user/.ssh/note-app-key**: Specifies the private key to authenticate with vm2.
+- **Source**: /home/ec2-user/.ssh/note-app-key (the file to copy).
+- **Destination**: ubuntu@1<public-ip>:/home/ubuntu/.ssh/note-app-key (where it’s going on vm2).
+
+### If It Fails:
+Set File Permissions:
+On vm1, ensure note-app-key has the right permissions:
+```bash
+chmod 600 /home/ec2-user/.ssh/note-app-key
+```
+
 `application-code/`
 - Test locally: `docker build -t note-app . && docker run -p 3000:3000 note-app`.
-
-
-`terraform/`
-- It can assign static private IPs to avoid changes when restarting.
-- Output public IPs for Ansible inventory.
 
 
 `ansible/`
@@ -161,10 +184,6 @@ terraform apply → Rebuilds ASG and instances.
 Next Steps:
 
 Ansible Setup
-Steps:
-Define inventory with EC2 IPs from Terraform outputs.
-Install prerequisites and Kubernetes components on all nodes.
-Initialize the master and join workers to the cluster.
 
 Automate the Process. Grok query - Step 2: Fetch Terraform Outputs
 - Dynamically fetch the private IP addresses of your nodes from Terraform outputs and use them in your Ansible inventory.
@@ -179,7 +198,6 @@ cicd
 - Graceful shutdown.txt
 
 - GPT query:
-🔹 Steps to Enable SSH from Control Node to Kubernetes Nodes
 
 2️⃣ Configure Ansible to Use the Control Node as a Bastion Host
 
