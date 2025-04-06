@@ -1,20 +1,19 @@
-# Use an existing node image as base image
-FROM node:14-alpine
+# Dockerfile for both Flask app and RQ worker
 
-# Set the working directory in the container
-WORKDIR /app
+# Use a lightweight Python base image
+FROM python:3.8-slim
 
-# Copy package.json and package-lock.json to the container
-COPY package*.json ./
+# Add metadata about the author
+LABEL author="div-ops123"
 
-# Install required packages
-RUN npm install
+# Set the container's working directory
+WORKDIR /url_shortener
 
-# Copy all files to the container
-COPY . .
+# Copy all project files into the container working directory
+COPY . /url_shortener
 
-# Expose port 3000
-EXPOSE 3000
+# Install dependencies from requirements.txt
+RUN pip install --upgrade pip && pip3 install -r requirements.txt
 
-# Start the application
-CMD [ "npm", "start" ]
+# Expose port 5000 for the Flask app
+EXPOSE 5000

@@ -1,0 +1,48 @@
+# Define the project name, grouping all resources under 'url-shortener-compose'
+name: url-shortener-compose
+
+# Define the services (containers) that make up the application
+services:
+  # Web service: Runs the Flask application
+  web:
+    # Build the image from the Dockerfile in the current directory
+    build: .
+    # Map port 5000 on the host to port 5000 in the container for browser access
+    ports:
+      - "5000:5000"
+    # Set environment variable for Redis connection (used by Flask app)
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    # Command to start the Flask app, listening on all interfaces
+    command: python web/app.py
+    # Ensure Redis starts before this service, as it depends on it
+    depends_on:
+      - redis
+
+  # Redis service: In-memory database for URL mappings and click counts
+  redis:
+    # Use the official Redis 6.2 image from Docker Hub
+    image: redis:6.2
+    # Start Redis with append-only mode for persistent data storage
+    command: redis-server --appendonly yes
+    # Mount a named volume to /data to store the append-only file (AOF)
+    volumes:
+      - redis-data:/data
+
+  # Worker service: Runs the RQ worker to process analytics jobs
+  worker:
+    # Build the image from the same Dockerfile as the web service
+    build: .
+    # Set environment variable for Redis connection (used by RQ worker)
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    # Command to start the RQ worker, processing jobs from the Redis queue
+    command: rq worker
+    # Ensure Redis starts before this service, as it depends on it
+    depends_on:
+      - redis
+
+# Define named volumes used by services for persistent storage
+volumes:
+  # Named volume for Redis data persistence, storing the AOF file
+  redis-data:

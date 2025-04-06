@@ -1,8 +1,5 @@
 ### Project Overview: Kubernetes(kubeadm) Infrastructure Automation on AWS
 
-**Disclaimer**: Application code by Author: Ryan Almeida
-📌 GitHub Profile: Ryan Almeida[https://github.com/ryan-almeida]
-
 **Goal**: Provision a scalable, containerized note-taking app on Kubernetes, deployed on EC2 instances using Terraform for infrastructure, Ansible for configuration management, and a CI/CD pipeline (Jenkins + Harness) for automation, using Terraform modules for networking and compute, and remote state in S3/DynamoDB.
 
 ## Kubernetes & Ansible:
@@ -13,7 +10,6 @@ One Control Node, One Master Node, and a Highly Available Worker Node setup acro
   - VPC, Subnets, Security Groups, Internet Gateway (IGW), Route Tables
   - EC2 instances for Kubernetes nodes
   - Auto Scaling Group (ASG) for worker nodes
-  - Application Load Balancer (ALB)
   - S3 bucket and DynamoDB table for Terraform state
 
 - **Configuration Management (Ansible)**:
@@ -38,7 +34,7 @@ Following best practices:
 
 ```
 ./
-├── application-code/          # Node.js note-app source code
+├── application-code/          # Node.js url-shortener source code
 │   ├── src/                  # App source files (e.g., server.js)
 │   ├── package.json          # Node.js dependencies and scripts
 │   ├── Dockerfile            # Docker image definition for the app
@@ -65,24 +61,16 @@ Following best practices:
 │   ├── playbooks/
 │   │   ├── install-k8s.yml   # Install Kubernetes (kubeadm, Docker, etc.)
 │   │   └── configure-cluster.yml  # Join nodes to the cluster
-│   └── roles/                # Reusable Ansible roles (optional)
-│       ├── kubernetes/
-│       │   ├── tasks/
-│       │   ├── templates/
-│       │   └── vars/
-├── kubernetes/               # Kubernetes manifests for the note-app
-│   ├── deployment.yml        # Deployment for the Node.js app
-│   ├── service.yml           # Service to expose the app (e.g., LoadBalancer)
-│   └── configmap.yml         # Optional: Config for the app (if needed)
-├── .gitignore                # Ignore transient files
 └── README.md                 # Project overview and setup instructions
 ```
 
 #### Prerequisites
 
-### Prerequisites
-aws, aws cli, terraform, ansible, python installed and set up
+### Prerequisites:
+1. Install AWS CLI, and Configure Credentials.
+2. [Terraform Installed](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli)
 3. Ansible installed (e.g via `pip3 install ansible --user`)
+4. Change the home_dir in terraform/modules/compute/variables.tf
 
 #### Deployment Guide
 
@@ -122,32 +110,32 @@ aws, aws cli, terraform, ansible, python installed and set up
 ## C. Enable SSH from Control Node to Kubernetes Nodes
 
 ### Copy the Private Key to the Control Node:
-Since the Kubernetes nodes uses `note-app-key.pub`, you need the matching private key (`note-app-key`) on the control node to SSH into them.
+Since the Kubernetes nodes uses `note-app-key.pub`, you need the matching private key (`url-shortener-key`) on the control node to SSH into them.
 
 1. **Step 1**: Locate the Private Key on the machine where you ran `ssh-keygen` e.g VM1
 
 2. **Step 2**: Copy the Private Key to the Control Node
 From VM1, SCP the private key to the control node:
 
-- Since `note-app-key` is the private key that matches control-node’s public key (from the AWS key pair), use it directly in the scp command from VM1. Example:
+- Since `url-shortener-key` is the private key that matches control-node’s public key (from the AWS key pair), use it directly in the scp command from VM1. Example:
 
 ```bash
-scp -i /home/ec2-user/.ssh/note-app-key /home/ec2-user/.ssh/note-app-key ubuntu@<public-ip>:/home/ubuntu/.ssh/note-app-key
+scp -i /home/ec2-user/.ssh/url-shortener-key /home/ec2-user/.ssh/url-shortener-key ubuntu@<public-ip>:/home/ubuntu/.ssh/url-shortener-key
 ```
 
-- **-i /home/ec2-user/.ssh/note-app-key**: Specifies the private key to authenticate with vm2.
-- **Source**: /home/ec2-user/.ssh/note-app-key (the file to copy).
-- **Destination**: ubuntu@1<public-ip>:/home/ubuntu/.ssh/note-app-key (where it’s going on vm2).
+- **-i /home/ec2-user/.ssh/url-shortener-key**: Specifies the private key to authenticate with vm2.
+- **Source**: /home/ec2-user/.ssh/url-shortener-key (the file to copy).
+- **Destination**: ubuntu@1<public-ip>:/home/ubuntu/.ssh/url-shortener-key (where it’s going on vm2).
 
 ### If It Fails:
 Set File Permissions:
-On vm1, ensure note-app-key has the right permissions:
+On vm1, ensure url-shortener-key has the right permissions:
 ```bash
 chmod 600 /home/ec2-user/.ssh/note-app-key
 ```
 
 `application-code/`
-- Test locally: `docker build -t note-app . && docker run -p 3000:3000 note-app`.
+- Test locally: `docker build -t url-shortener . && docker run -p 3000:3000 url-shortener`.
 
 
 `ansible/`

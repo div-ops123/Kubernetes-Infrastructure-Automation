@@ -18,9 +18,9 @@ output "igw_id" {
   value       = module.vpc.igw_id
 }
 
-output "alb_sg_id" {
+output "nat_eip" {
   description = "ALB Security Group ID"
-  value       = module.vpc.alb_sg_id
+  value       = module.vpc.nat_eip
 }
 
 output "k8s_nodes_sg_id" {

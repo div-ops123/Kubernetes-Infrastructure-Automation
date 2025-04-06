@@ -3,7 +3,7 @@ resource "aws_vpc" "vpc" {
   tags = merge(
     var.common_tags,
     {
-      "Name" = "note-app-vpc"
+      "Name" = "url-shortener-vpc"
     }
   )
 }
@@ -26,7 +26,7 @@ resource "aws_subnet" "public-subnets" {
   tags = merge(
     var.common_tags,
     {
-      "Name" = "note-app-public-subnet-${count.index + 1}"
+      "Name" = "url-shortener-public-subnet-${count.index + 1}"
     }
   )
 }
@@ -42,7 +42,7 @@ resource "aws_subnet" "private-subnets" {
   tags = merge(
     var.common_tags,
     {
-      "Name" = "note-app-private-subnet-${count.index + 1}"
+      "Name" = "url-shortener-private-subnet-${count.index + 1}"
     }
   )
 }
@@ -57,10 +57,28 @@ resource "aws_internet_gateway" "igw" {
   tags = merge(
     var.common_tags,
     {
-      "Name" = "note-app-igw"
+      "Name" = "url-shortener-igw"
     }
   )
 }
+
+# Elastic IP for NAT Gateway
+resource "aws_eip" "nat_eip" {
+  domain = "vpc"  # Ensures the EIP is allocated within the VPC
+
+  tags = merge(var.common_tags, {"Name" = "url-shortener-nat-eip"})
+}
+
+resource "aws_nat_gateway" "nat-gateway" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = var.public_subnets[0]         # AZ-1 first public subnet
+
+  tags = merge(var.common_tags, {"Name" = "url-shortener-nat"})
+
+  # To ensure proper ordering, Explicit dependency on the Internet Gateway
+  depends_on = [aws_internet_gateway.igw]
+}
+
 
 ########################################################################
 #### Start of Route Tables.
@@ -68,7 +86,7 @@ resource "aws_internet_gateway" "igw" {
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.vpc.id
 
-  tags = merge(var.common_tags, {"Name" = "note-app-public-rt"})
+  tags = merge(var.common_tags, {"Name" = "url-shortener-public-rt"})
 }
 
 # A Route specifies how to send traffic for a certain destination (e.g., internet, another VPC, a VPN).
@@ -89,18 +107,22 @@ resource "aws_route_table_association" "public" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.vpc.id
 
-  tags = merge(var.common_tags, {"Name" = "note-app-private-rt"})
+  tags = merge(var.common_tags, {"Name" = "url-shortener-private-rt"})
 }
 
 # Route: Local route (10.0.0.0/16 → local) is auto-added.
-# Traffic between subnets (e.g., private subnet nodes talking to each other or to the ALB in public subnets) uses this route. 
-# local = the VPC itself, Nodes in private subnet can reach ALB, and themselselves, but not the internet because NAT Gateway is not added yet.
+# Route for NAT Gateway in Private Route Table
+resource "aws_route" "private-nat" {
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"                    # All outbound traffic
+  nat_gateway_id         = aws_nat_gateway.nat-gateway.id # Directs traffic to the NAT Gateway
+}
 
 # Creates an Association between a Route Table and an Internet Gateway
 resource "aws_route_table_association" "private" {
-  count = length(var.private_subnets)
+  count = length(var.private_subnets)                     # Dynamically associates each subnet in var.private_subnets
   subnet_id = aws_subnet.private-subnets[count.index].id
-  route_table_id = aws_route_table.private.id
+  route_table_id = aws_route_table.private.id             # Associates all private subnets with the private route table
 }
 ## End of Route Table
 ########################################################################
@@ -109,106 +131,101 @@ resource "aws_route_table_association" "private" {
 ########################################################################
 ## Start of Security Groups
 
-# ALB SG - HTTP traffic from ALB to nodes
-resource "aws_security_group" "alb-sg" {
-  name        = "note-app-ALB-sg"
-  description = "Allows public HTTP traffic to the ALB and forwards to kubernetes nodes"
-  vpc_id      = aws_vpc.vpc.id
-
-  tags = merge(var.common_tags, {"Name" = "note-app-alb-sg"})
-}
-
 # Kubernetes Nodes SG:
 resource "aws_security_group" "k8s-nodes-sg" {
-  name        = "note-app-k8s-nodes-sg"
+  name        = "url-shortener-k8s-nodes-sg"
   description = "Security group for Kubernetes nodes"
   vpc_id      = aws_vpc.vpc.id
 
-  tags = merge(var.common_tags, {"Name" = "note-app-k8s-nodes-sg"})
+  tags = merge(var.common_tags, {"Name" = "url-shortener-k8s-nodes-sg"})
 }
 
 # Control Node SG:
 resource "aws_security_group" "control-node-sg" {
-  name        = "note-app-control-node-sg"
+  name        = "url-shortener-control-node-sg"
   description = "Security group for Control node"
   vpc_id      = aws_vpc.vpc.id
 
-  tags = merge(var.common_tags, {"Name" = "note-app-control-node-sg"})
+  tags = merge(var.common_tags, {"Name" = "url-shortener-control-node-sg"})
 }
 
 
-# If you have multiple local values, create locals.tf for better organization.
 locals {
-  ingress_rules = {         # Inbound traffic allowed into k8s sg
-    # format: to_from_resource
-    k8s_nodes_from_alb = {  # to k8s nodes : from alb sg
-      from_port   = 30000   # NodePort services
+  ingress_rules = {
+    # Allow traffic from the Load Balancer to NodePorts
+    k8s_nodes_from_alb = {
+      from_port   = 30000   # NodePort range for LoadBalancer services
       to_port     = 32767
       protocol    = "tcp"
-      source_sg   = aws_security_group.alb-sg.id
+      cidr_blocks = ["0.0.0.0/0"]  # Update to ELB SG after deployment
     },
-    k8s_nodes_from_control_node = { # To k8s nodes : From control node sg
+    # Allow SSH from control node
+    k8s_nodes_from_control_node = {
       from_port   = 22
       to_port     = 22
       protocol    = "tcp"
-      source_sg   = aws_security_group.control-node-sg.id
+      source_sg   = "control-node-sg"  # Static key, resolved later
     },
-    k8s_nodes_api = {        # To k8s nodes : From self
+    # Kubernetes API server
+    k8s_nodes_api = {
       from_port   = 6443
       to_port     = 6443
       protocol    = "tcp"
-      source_sg   = aws_security_group.k8s-nodes-sg.id
+      source_sg   = "k8s-nodes-sg"  # Self-reference
     },
-    k8s_nodes_etcd = {        # To k8s nodes : From self
+    # etcd communication
+    k8s_nodes_etcd = {
       from_port   = 2379
       to_port     = 2380
       protocol    = "tcp"
-      source_sg   = aws_security_group.k8s-nodes-sg.id
+      source_sg   = "k8s-nodes-sg"  # Self-reference
     },
-    k8s_nodes_kubelet = {      # To k8s nodes : From self
+    # Kubelet communication
+    k8s_nodes_kubelet = {
       from_port   = 10250
       to_port     = 10252
       protocol    = "tcp"
-      source_sg   = aws_security_group.k8s-nodes-sg.id
+      source_sg   = "k8s-nodes-sg"  # Self-reference
     },
-    k8s_nodes_all = {         # To k8s nodes : From self
+    # All TCP traffic between nodes (e.g., pod-to-pod communication)
+    k8s_nodes_all = {
       from_port   = 0
       to_port     = 65535
       protocol    = "tcp"
-      source_sg   = aws_security_group.k8s-nodes-sg.id
+      source_sg   = "k8s-nodes-sg"  # Self-reference
     }
   }
 }
 
-resource "aws_security_group_rule" "alb-ingress" {
-  type              = "ingress"                   # Direction - Inbound
-  description       = "HTTP ingress"
-  from_port         = 3000                        # my app.js app runs on port 3000
-  to_port           = 3000
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]                # Destination - Allows inbound traffic from anywhere (inside or outside the VPC).
-  security_group_id = aws_security_group.alb-sg.id # Source - Rule is attached to ALB's sg.
-}
 
-# ALB can forward traffic to Kubernetes nodes only
-resource "aws_security_group_rule" "alb-egress" {
-  type              = "egress"            # Direction - Outbound
-  description       = "Limits the ALB to talk only to the worker node group, not the whole internet."
-  from_port         = 30000               # NodePort range, meaning ALB can forward traffic to the app running in Kubernetes.
-  to_port           = 32767
-  protocol          = "tcp"
-  security_group_id = aws_security_group.alb-sg.id  # Source - Rule is attached to the ALB’s security group.
-  source_security_group_id = aws_security_group.k8s-nodes-sg.id # Destination - Where to send traffic to.
+locals {
+  control_node_ingress_rules = {
+    # New rule for Flask app testing locally
+    control_node_from_flask = {
+      from_port   = 5000
+      to_port     = 5000
+      protocol    = "tcp"
+    }
+
+    # SSH rule
+    control_node_from_ssh = {
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+    }
+  }
 }
 
 # Cotrol node SG
 resource "aws_security_group_rule" "control-node-ingress" {
+  for_each = local.control_node_ingress_rules
+
   type              = "ingress"                   # Direction - Inbound
-  description       = "Allow SSH from anywhere"
-  from_port         = 22                        
-  to_port           = 22
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]                # Destination - Allows inbound traffic from anywhere (inside or outside the VPC).
+  description       = "Control Node Inbound rule"
+  from_port         = each.value.from_port                       
+  to_port           = each.value.to_port
+  protocol          = each.value.protocol
+  cidr_blocks       = ["0.0.0.0/0"]                # Destination - Allows inbound traffic from anywhere
   security_group_id = aws_security_group.control-node-sg.id # Source - Rule is attached to Control node's sg.
 }
 
@@ -222,17 +239,34 @@ resource "aws_security_group_rule" "control-node-egress" {
   cidr_blocks       = ["0.0.0.0/0"]                          # Destination - Send traffic to anywhere in and out of VPC
 }
 
-# Kubernetes nodes can receive traffic from 
-resource "aws_security_group_rule" "k8s-nodes-ingress" {
-  for_each          = local.ingress_rules     # Uses for_each to create multiple security group rules dynamically.
+# Handles rules with cidr_blocks (e.g., k8s_nodes_from_alb)
+resource "aws_security_group_rule" "k8s-nodes-ingress-cidr" {
+  for_each          = { for k, v in local.ingress_rules : k => v if lookup(v, "cidr_blocks", null) != null }
 
   type              = "ingress"
-  description       = "Ingress rule for k8s nodes"
+  description       = "Ingress rule for k8s nodes from CIDR"
   from_port         = each.value.from_port
   to_port           = each.value.to_port
   protocol          = each.value.protocol
-  source_security_group_id = each.value.source_sg         # Destination - Allows inbound traffic from source_sg to k8s nodes
-  security_group_id = aws_security_group.k8s-nodes-sg.id  # Source - Rule is attached to k8s nodes's sg.
+  cidr_blocks       = each.value.cidr_blocks
+  security_group_id = aws_security_group.k8s-nodes-sg.id
+}
+
+# Handles rules with source_sg
+resource "aws_security_group_rule" "k8s-nodes-ingress-sg" {
+  for_each          = { for k, v in local.ingress_rules : k => v if lookup(v, "source_sg", null) != null }
+
+  type              = "ingress"
+  description       = "Ingress rule for k8s nodes from SG"
+  from_port         = each.value.from_port
+  to_port           = each.value.to_port
+  protocol          = each.value.protocol
+  security_group_id = aws_security_group.k8s-nodes-sg.id
+  source_security_group_id = (
+    each.value.source_sg == "control-node-sg" ? aws_security_group.control-node-sg.id :
+    each.value.source_sg == "k8s-nodes-sg" ? aws_security_group.k8s-nodes-sg.id :
+    null  # Add more conditions if needed
+  )
 }
 
 resource "aws_security_group_rule" "k8s-nodes-egress" {

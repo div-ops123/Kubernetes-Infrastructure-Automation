@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Shortened URLs</title>
+</head>
+<body>
+    <h1>Shortened URLs</h1>
+    <ul>
+        {% for short_code, original_url in urls.items() %}
+        <li>
+            <a href="{{ url_for('redirect_to_url', short_code=short_code, _external=True) }}">
+                {{ short_code }}
+            </a>: {{ original_url }}
+        </li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('index') }}">Back to Home</a>
+</body>
+</html>

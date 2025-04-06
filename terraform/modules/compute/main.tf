@@ -4,7 +4,7 @@
 # key-pair for the ec2 instances for ssh access
 # Generate SSH key locally, e.g., ssh-keygen -f note-app-key
 # Place it in your home_dir/.ssh folder
-resource "aws_key_pair" "note-app" {
+resource "aws_key_pair" "note-app-key" {
   key_name   = "note-app-key"
   public_key = file("${var.home_dir}/.ssh/note-app-key.pub")
 }
@@ -14,41 +14,25 @@ data "aws_ssm_parameter" "ubuntu_ami" {
   name = "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
 }
 
-# Ubuntu EC2 instance for master node using AMI lookup
-# data "aws_ami" "ubuntu" {
-#   most_recent = true
-#   filter {
-#     name   = "name"
-#     values = ["ubuntu/images/hvm-ssd/ubuntu-noble-24.04-amd64-server-*"]
-#     # values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
-#   }
-#   filter {
-#     name   = "virtualization-type"
-#     values = ["hvm"]
-#   }
-#   owners = ["099720109477"] # Canonical
-# }
-
 # Control node: Acts as a `bastion host` for Ansible to access private nodes.
 resource "aws_instance" "control-node" {
   ami           = data.aws_ssm_parameter.ubuntu_ami.value   # .value gives the AMI ID string
   instance_type = "t3.medium"
   subnet_id     = var.public_subnet_ids[0]                  # AZ-1 first public subnet.
   vpc_security_group_ids = [ var.control_node_sg_id ]
-  key_name      = aws_key_pair.note-app.key_name            # public key (note-app-key.pub) is automatically added to /home/ubuntu/.ssh/authorized_keys
+  key_name      = aws_key_pair.note-app-key.key_name            # public key (url-shortener-key.pub) is automatically added to /home/ubuntu/.ssh/authorized_keys
   associate_public_ip_address = true                        # Since it’s in a public subnet
   
   tags = merge(var.common_tags, {Name = "control-node"})
 }
 
 resource "aws_instance" "master-node" {
-  # ami           = data.aws_ami.ubuntu.id
   ami           = data.aws_ssm_parameter.ubuntu_ami.value   # .value gives the AMI ID string
   instance_type = "t3.medium"
   subnet_id     = var.private_subnet_ids[0]                 # AZ-1 first private subnet
   vpc_security_group_ids = [ var.k8s_nodes_sg_id ]
-  key_name      = aws_key_pair.note-app.key_name            # public key (note-app-key.pub) is automatically added to /home/ubuntu/.ssh/authorized_keys
-  associate_public_ip_address = false                       # Private Subnet, no public IP needed yet; Ansible can use a bastion or NAT later if required
+  key_name      = aws_key_pair.note-app-key.key_name            # public key (note-app-key.pub) is automatically added to /home/ubuntu/.ssh/authorized_keys
+  associate_public_ip_address = false                       # Private Subnet
 
   tags = merge(var.common_tags, {Name = "master-node"})
 }
@@ -61,10 +45,10 @@ resource "aws_instance" "master-node" {
 ##################################
 # Launch Template: Defines worker node config
 resource "aws_launch_template" "worker-node" {
-  name_prefix   = "note-app-worker-node-"
+  name_prefix   = "url-shortener-worker-node-"
   image_id      = data.aws_ssm_parameter.ubuntu_ami.value
   instance_type = "t3.medium"
-  key_name      = aws_key_pair.note-app.key_name
+  key_name      = aws_key_pair.note-app-key.key_name
   vpc_security_group_ids = [ var.k8s_nodes_sg_id ]  # Get from vpc module
 
   tag_specifications {
@@ -81,7 +65,7 @@ resource "aws_launch_template" "worker-node" {
 # ASG: Manages 2-4 worker instances across private subnets
 # Ensure ASG tags propagate(spread widely) to Instances
 resource "aws_autoscaling_group" "workers" {
-  name                 = "note-app-workers"
+  name                 = "url-shortener-workers"
   desired_capacity     = 2
   max_size             = 4
   min_size             = 2

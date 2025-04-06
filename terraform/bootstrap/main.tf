@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "tf-state" {
-  bucket = "divine-note-app-store-tf-state"
+  bucket = "divine-url-shortener-store-tf-state"
   force_destroy = true
 }
 

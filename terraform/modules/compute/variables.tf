@@ -10,7 +10,7 @@ variable "common_tags" {
 variable "home_dir" {
   description = "Home directory"
   type        = string
-  default     = "/home/ec2-user"
+  default     = "/home/ubuntu"
 }
 
 variable "private_subnet_ids" {
