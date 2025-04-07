@@ -43,12 +43,12 @@ output "control_node_public_ip" {
   value = module.compute.control_node_public_ip
 }
 
-# output "master_private_ip" {
-#   description = "Private IP of the master node"
-#   value       = module.compute.master_private_ip
-# }
+output "master_private_ip" {
+  description = "Private IP of the master node"
+  value       = module.compute.master_private_ip
+}
 
-# output "worker_instance_ips" {
-#   description = "IPs of worker instances"
-#   value       = module.compute.worker_instance_ips
-# }
+output "worker_instance_ips" {
+  description = "IPs of worker instances"
+  value       = module.compute.worker_instance_ips
+}
