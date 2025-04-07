@@ -71,7 +71,7 @@ resource "aws_eip" "nat_eip" {
 
 resource "aws_nat_gateway" "nat-gateway" {
   allocation_id = aws_eip.nat_eip.id
-  subnet_id     = var.public_subnets[0]         # AZ-1 first public subnet
+  subnet_id     = aws_subnet.public-subnets[0].id         # AZ-1 first public subnet ID
 
   tags = merge(var.common_tags, {"Name" = "url-shortener-nat"})
 

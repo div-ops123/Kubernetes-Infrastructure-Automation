@@ -38,12 +38,17 @@ output "private_route_table_id" {
   value       = module.vpc.private_route_table_id
 }
 
-output "master_private_ip" {
-  description = "Private IP of the master node"
-  value       = module.compute.master_private_ip
+output "control_node_public_ip" {
+  description = "Control node public IP"
+  value = module.compute.control_node_public_ip
 }
 
-output "worker_instance_ips" {
-  description = "IPs of worker instances"
-  value       = module.compute.worker_instance_ips
-}
+# output "master_private_ip" {
+#   description = "Private IP of the master node"
+#   value       = module.compute.master_private_ip
+# }
+
+# output "worker_instance_ips" {
+#   description = "IPs of worker instances"
+#   value       = module.compute.worker_instance_ips
+# }
