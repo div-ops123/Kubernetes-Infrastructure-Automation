@@ -7,6 +7,12 @@ variable "common_tags" {
   }
 }
 
+variable "home_dir" {
+  description = "Directory where keys are"
+  type        = string
+  default     = "/home/ubuntu"
+}
+
 variable "private_subnet_ids" {
   description = "List of private subnet IDs"
   type        = list(string)
