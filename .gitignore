@@ -3,4 +3,5 @@ Instructions.md
 *.tfstate
 *.tfstate.backup
 terraform.tfvars
-terraform/modules/compute/key-pair/*
+
+ansible/playbooks/kubeconfig

@@ -11,8 +11,8 @@
       register: kubeadm_init      # Stores output for later use
       changed_when: kubeadm_init.rc == 0 # Marks as changed if successful
 
-    # Set up kubeconfig for the user
-    - name: Create .kube directory
+    # Set up kubeconfig for master node
+    - name: Create .kube directory on master
       file:
         path: /home/{{ ansible_user }}/.kube
         state: directory
@@ -20,14 +20,22 @@
         group: "{{ ansible_user }}"
         mode: '0755'
 
-    - name: Copy admin.conf to user's kubeconfig
+    - name: Copy kubeconfig to master's user home
       copy:
         src: /etc/kubernetes/admin.conf
         dest: /home/{{ ansible_user }}/.kube/config
-        remote_src: yes
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
-        mode: '0600'
+        mode: '0644'
+        remote_src: yes
+
+    # To manage the cluster remotely (e.g., from your control-node), 
+    # copy the kubeconfig file from the master node to control-node
+    - name: Fetch kubeconfig to control node
+      fetch:
+        src: /home/{{ ansible_user }}/.kube/config
+        dest: ./kubeconfig
+        flat: yes
 
     # Install Flannel network plugin, enabling pod-to-pod communication.
     - name: Install Flannel
@@ -55,5 +63,5 @@
   tasks:
     # Join worker nodes using the join command from master
     - name: Join worker to the cluster
-      command: "{{ hostvars['k8s_master']['join_command'].stdout }}"
-      when: hostvars['k8s_master']['join_command'] is defined
+      command: "{{ hostvars['master']['join_command'].stdout }}"
+      when: hostvars['master']['join_command'] is defined
