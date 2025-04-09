@@ -160,9 +160,16 @@ locals {
       cidr_blocks = ["0.0.0.0/0"]  # Update to ELB SG after deployment
     },
     # Allow SSH from control node
-    k8s_nodes_from_control_node = {
+    k8s_nodes_from_control_node_ssh = {
       from_port   = 22
       to_port     = 22
+      protocol    = "tcp"
+      source_sg   = "control-node-sg"  # Static key, resolved later
+    },
+    # Allow control node to talk to Kubernetes API Server
+    k8s_nodes_from_control_node_api = {
+      from_port   = 6443
+      to_port     = 6443
       protocol    = "tcp"
       source_sg   = "control-node-sg"  # Static key, resolved later
     },
@@ -229,6 +236,7 @@ resource "aws_security_group_rule" "control-node-ingress" {
   security_group_id = aws_security_group.control-node-sg.id # Source - Rule is attached to Control node's sg.
 }
 
+# Restrict: Allow control node to outbound traffic to Kubernetes API server(port 6443) on all K8s nodes
 resource "aws_security_group_rule" "control-node-egress" {
   type              = "egress"       
   description       = "Allow control-node to reach any IP on the internet"
