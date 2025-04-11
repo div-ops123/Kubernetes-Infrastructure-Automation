@@ -52,3 +52,7 @@ output "worker_instance_ips" {
   description = "IPs of worker instances"
   value       = module.compute.worker_instance_ips
 }
+
+output "storage_class_name" {
+  value = kubernetes_storage_class.ebs_sc.metadata[0].name  # Outputs "ebs-sc"
+}
