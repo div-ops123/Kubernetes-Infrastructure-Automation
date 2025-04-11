@@ -1,9 +1,11 @@
-### Project Overview: Kubernetes(kubeadm) Infrastructure Automation on AWS
+### Project Overview: End-To-End DevOps Kubernetes Project with Terraform Ansible Jenkins and ArgoCD
+
+# PERSUASIVE CONTENTS
 
 **Goal**: Provision a scalable, containerized note-taking app on Kubernetes, deployed on EC2 instances using Terraform for infrastructure, Ansible for configuration management, and a CI/CD pipeline (Jenkins + Harness) for automation, using Terraform modules for networking and compute, and remote state in S3/DynamoDB.
 
-## Kubernetes & Ansible:
-One Control Node, One Master Node, and a Highly Available Worker Node setup across Two AZs.
+## Kubernetes Setup:
+Self-Managed K8s: 3 EC2 instances (1 control plane, 2 workers?) running kubeadm.
 
 **Components**:
 - **Infrastructure (Terraform)**:
