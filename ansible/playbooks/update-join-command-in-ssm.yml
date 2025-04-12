@@ -1,0 +1,19 @@
+---
+- name: Update join command in SSM
+  hosts: k8s_master
+  become: yes
+  tasks:
+    - name: Get join command
+      shell: kubeadm token create --print-join-command --ttl 0  # Non-expiring token
+      register: join_command
+      changed_when: false
+
+    - name: Store join command in AWS SSM Parameter Store
+      community.aws.ssm_parameter:
+        name: "/url-shortener-k8s/join-command"
+        description: "Kubernetes join command for worker nodes"
+        value: "{{ join_command.stdout }}"
+        type: "SecureString"
+        state: "present"
+        region: "{{ aws_region | default('af-south-1') }}"
+      delegate_to: localhost

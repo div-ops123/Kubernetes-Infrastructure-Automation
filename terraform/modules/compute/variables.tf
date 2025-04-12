@@ -32,3 +32,9 @@ variable "control_node_sg_id" {
   description = "Security group ID for Control Node"
   type        = string
 }
+
+variable "region_name" {
+  description = "AWS Region to deploy resources to."
+  type = string
+  default = "af-south-1"
+}
