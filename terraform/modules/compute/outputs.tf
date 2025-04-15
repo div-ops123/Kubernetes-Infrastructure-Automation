@@ -20,3 +20,8 @@ output "worker_instance_ips" {
   description = "IPs of worker instances"
   value       = data.aws_instances.workers.private_ips
 }
+
+output "worker_asg_name" {
+  description = "Name of the worker auto scaling group"
+  value       = aws_autoscaling_group.workers.name
+}

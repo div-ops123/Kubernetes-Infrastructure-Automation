@@ -1,7 +1,7 @@
-# Purpose: Initializes the master node and joins workers to the cluster.
+# Purpose: This initializes the master node, generates the join command, stores it in SSM, and joins worker nodes.
 
 ---
-- name: Initialize the cluster
+- name: Initialize the cluster on master node
   hosts: k8s_master               # Run only on master node
   become: yes                     # Runs as root
   tasks:
@@ -45,23 +45,37 @@
 
     # Retrieve the join command for worker nodes
     - name: Get join command
-      shell: kubeadm token create --print-join-command    # Generate the join command
+      shell: kubeadm token create --print-join-command --ttl 0    # Generate the join command Non-expiring token
       register: join_command                              # Stores it(generated join command) in the `join_command` variable
       changed_when: false
 
-    # Saves the join command to a file on your local machine (/tmp/k8s_join_command.sh)
-    - name: Save join command to local file
-      local_action:
-        module: copy
-        content: "{{ join_command.stdout }}"
-        dest: /tmp/k8s_join_command.sh  # Saves it(generated join command) locally to /tmp/k8s_join_command.sh
-      delegate_to: localhost            # Run the task on your local machine (the control node running Ansible), not the remote k8s_master node
+    - name: Store join command in AWS SSM Parameter Store
+      command: >
+        aws ssm put-parameter --name "/url-shortener-k8s/join-command" --value "{{ join_command.stdout }}" --type SecureString --overwrite --region {{ aws_region }}
+      delegate_to: localhost    # Run the task on your local machine (the control node running Ansible), not the remote k8s_master node
 
-- name: Join workers to the cluster
-  hosts: k8s_workers             # Targets only worker nodes
-  become: yes                    # Runs as root
-  tasks:
+    # Saves the join command to a file on your local machine (/tmp/k8s_join_command.sh)
+    # - name: Save join command to local file
+    #   local_action:
+    #     module: copy
+    #     content: "{{ join_command.stdout }}"
+    #     dest: /tmp/k8s_join_command.sh  # Saves it(generated join command) locally to /tmp/k8s_join_command.sh
+    #   delegate_to: localhost            # Run the task on your local machine (the control node running Ansible), not the remote k8s_master node
+
+# - name: Join workers to the cluster
+#   hosts: k8s_workers             # Targets only worker nodes
+#   become: yes                    # Runs as root
+#   tasks:
+#     - name: Fetch join command from SSM
+#       shell: aws ssm get-parameter --name "/url-shortener-k8s/join-command" --with-decryption --query 'Parameter.Value' --output text --region {{ aws_region }}
+#       register: join_command
+#       delegate_to: localhost
+
+#     - name: Execute join command
+#       command: "{{ join_command.stdout }}"
+
+    # If not saving join_command to ssm parameter in aws uncomment this section, and comment the 2 above
     # Join worker nodes using the join command from master
-    - name: Join worker to the cluster
-      command: "{{ hostvars['master']['join_command'].stdout }}"
-      when: hostvars['master']['join_command'] is defined
+    # - name: Join worker to the cluster
+    #   command: "{{ hostvars['master']['join_command'].stdout }}"
+    #   when: hostvars['master']['join_command'] is defined

@@ -7,3 +7,4 @@ aws
 awscliv2.zip
 
 ansible/playbooks/kubeconfig
+ansible/aws_ec2.yml

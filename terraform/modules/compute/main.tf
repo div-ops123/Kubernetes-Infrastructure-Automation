@@ -69,6 +69,11 @@ resource "aws_iam_policy" "worker_nodes_ssm_access" {
         Effect   = "Allow"
         Action   = "ssm:GetParameter"
         Resource = "arn:aws:ssm:${var.region_name}:${data.aws_caller_identity.current.account_id}:parameter/url-shortener-k8s/join-command"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "ssm:DescribeParameters"
+        Resource =  "*"
       }
     ]
   })
@@ -123,12 +128,83 @@ resource "aws_launch_template" "worker-node" {
   user_data = base64encode(<<-EOT
     #!/bin/bash
     set -e
+    exec > /var/log/user-data.log 2>&1  # Redirect output to a log file
+    echo "Starting user data script"
+
+    # Update package cache
+    apt-get update -y
+    echo "Apt update completed"
+
+    # Install prerequisite packages
+    apt-get install -y apt-transport-https curl containerd unzip
+    echo "Prerequisites installed"
+
+    # Install AWS CLI
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    unzip awscliv2.zip
+    sudo ./aws/install
+    rm -rf awscliv2.zip aws
+    echo "AWS CLI installed"
+
+    # Configure containerd
+    mkdir -p /etc/containerd
+    containerd config default > /etc/containerd/config.toml
+    sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+    systemctl restart containerd
+    echo "Containerd configured"
+
+    # Add Kubernetes apt key
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    # Add Kubernetes apt repository
+    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /" > /etc/apt/sources.list.d/kubernetes.list
+
+    # Update apt cache and install Kubernetes components
+    apt-get update -y
+    apt-get install -y kubelet kubeadm kubectl
+
+    # Hold Kubernetes packages at the current version
+    apt-mark hold kubelet kubeadm kubectl
+    echo "Kubernetes components installed"
+
+    # Disable swap
+    swapoff -a
+    sed -i '/swap/d' /etc/fstab
+
+    # Load necessary kernel modules
+    modprobe overlay
+    modprobe br_netfilter
+
+    # Set required sysctl parameters
+    cat <<EOF > /etc/sysctl.d/k8s.conf
+    net.bridge.bridge-nf-call-iptables  = 1
+    net.bridge.bridge-nf-call-ip6tables = 1
+    net.ipv4.ip_forward                 = 1
+    EOF
+    sysctl --system
+    echo "System configured"
+
+    # Retry fetching join command until available
+    MAX_ATTEMPTS=30
+    ATTEMPT=1
+    while ! JOIN_COMMAND=$(aws ssm get-parameter --name "/url-shortener-k8s/join-command" --with-decryption --query "Parameter.Value" --output text --region ${var.region_name}); do
+      if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+        echo "Failed to fetch join command after $MAX_ATTEMPTS attempts"
+        exit 1
+      fi
+      echo "Attempt $ATTEMPT: Join command not yet available, retrying in 10 seconds..."
+      sleep 10
+      ATTEMPT=$((ATTEMPT + 1))
+    done
+    echo "Join command fetched on attempt number $ATTEMPT: $JOIN_COMMAND"
 
     # Fetch the join command from SSM Parameter Store
-    JOIN_COMMAND=$(aws ssm get-parameter --name "/url-shortener-k8s/join-command" --query "Parameter.Value" --output text --region ${var.region_name})
+    # JOIN_COMMAND=$(aws ssm get-parameter --name "/url-shortener-k8s/join-command" --with-decryption --query "Parameter.Value" --output text --region ${var.region_name})
 
     # Execute the join command
     $JOIN_COMMAND
+    echo "Join command executed"
   EOT
   )
 
@@ -147,9 +223,9 @@ resource "aws_launch_template" "worker-node" {
 # Ensure ASG tags propagate(spread widely) to Instances
 resource "aws_autoscaling_group" "workers" {
   name                 = "url-shortener-workers"
-  desired_capacity     = 2
+  min_size             = 0
   max_size             = 4
-  min_size             = 2
+  desired_capacity     = 0                        # Start with 0 to delay worker provisioning, giving you time to initialize the master node with Ansible
   vpc_zone_identifier = var.private_subnet_ids    # Distributes instances across both AZs
 
   launch_template {
@@ -167,4 +243,7 @@ resource "aws_autoscaling_group" "workers" {
     value               = "worker"
     propagate_at_launch = true
   }
+
+  # Ensure master is up before launching workers
+  depends_on = [aws_instance.master-node]
 }

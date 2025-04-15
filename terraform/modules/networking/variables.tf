@@ -3,7 +3,7 @@ variable "common_tags" {
   type = map(string)
   default = {
     Terraform   = "true"
-    Environment = "dev"
+    Project = "url-shortener"
   }
 }
 

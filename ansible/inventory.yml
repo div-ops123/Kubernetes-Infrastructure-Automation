@@ -1,29 +1,33 @@
 # Purpose: Lists your master and worker nodes for Ansible to target.
 
 # Defines groups of hosts (master and workers) for Ansible to manage
+# # Workers added later
 all:
   hosts:
     master:
-      ansible_host: 10.0.1.251 # Master node private IP from Terraform
-    worker1:
-      ansible_host: 10.0.2.101 # Worker1 node private IP from Terraform
-    worker2:
-      ansible_host: 10.0.1.24 # Worker2 node private IP from Terraform
+      ansible_host: 10.0.1.179 # Master node private IP from Terraform
+    # worker1:
+    #   ansible_host: 10.0.2.29 # Worker1 node private IP from Terraform
+    # worker2:
+    #   ansible_host: 10.0.1.234 # Worker2 node private IP from Terraform
 
   vars:
     ansible_user: ubuntu    # Default user for Ubuntu AMI
     ansible_ssh_private_key_file: /home/ubuntu/.ssh/url-shortener    # Path to your SSH private key
+    aws_region: af-south-1
+    # To avoid Host key verification failed and interactive prompts
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 
   children:
     k8s_nodes:              # Group for all Kubernetes nodes
       hosts:
         master:
-        worker1:
-        worker2:
+        # worker1:
+        # worker2:
     k8s_master:           # Group for master node
       hosts:
         master:
-    k8s_workers:          # Group for worker nodea
+    k8s_workers:          # Group for worker nodes
       hosts:
-        worker1:
-        worker2:
+        # worker1:
+        # worker2:
