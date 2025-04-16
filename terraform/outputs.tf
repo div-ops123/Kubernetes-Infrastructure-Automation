@@ -58,6 +58,6 @@ output "worker_asg_name" {
 }
 
 
-# output "storage_class_name" {
-#   value = kubernetes_storage_class.ebs_sc.metadata[0].name  # Outputs "ebs-sc"
-# }
+output "storage_class_name" {
+  value = kubernetes_storage_class.ebs_sc.metadata[0].name  # Outputs "ebs-sc"
+}
