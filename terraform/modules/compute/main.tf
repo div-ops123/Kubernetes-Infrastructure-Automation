@@ -38,6 +38,7 @@ resource "aws_key_pair" "url-shortener" {
 #######################################
 # Start of IAM Role
 
+# Worker Nodes IAM Role
 # define the IAM role and policy for accessing the SSM parameter:
 # The `aws_iam_role` allows EC2 instances to assume the role.
 resource "aws_iam_role" "worker_nodes" {
@@ -58,17 +59,22 @@ resource "aws_iam_role" "worker_nodes" {
 }
 
 # `aws_iam_policy` grants permission to read the specific SSM parameter
-resource "aws_iam_policy" "worker_nodes_ssm_access" {
-  name        = "worker-nodes-ssm-access"
-  description = "Allow worker nodes to read the join command from SSM Parameter Store"
+# resource "aws_iam_policy" "worker_nodes_ssm_access" {
+resource "aws_iam_policy" "k8s_nodes_ssm_access" {
+  name        = "k8s-nodes-ssm-access"
+  description = "Allow worker nodes, and master node to read the join command from SSM Parameter Store"
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
         Effect   = "Allow"
-        Action   = "ssm:GetParameter"
+        Action   = [
+          "ssm:GetParameter",
+          "ssm:GetParameters"
+        ]
         Resource = "arn:aws:ssm:${var.region_name}:${data.aws_caller_identity.current.account_id}:parameter/url-shortener-k8s/join-command"
+        # Resource = "arn:aws:ssm:${var.region_name}:*:parameter/url-shortener-k8s/*"
       },
       {
         Effect   = "Allow"
@@ -80,10 +86,41 @@ resource "aws_iam_policy" "worker_nodes_ssm_access" {
 }
 
 # `aws_iam_role_policy_attachment` attaches the policy to the role
-resource "aws_iam_role_policy_attachment" "worker_nodes_ssm_access" {
+resource "aws_iam_role_policy_attachment" "k8s_nodes_ssm_access" {
   role       = aws_iam_role.worker_nodes.name
-  policy_arn = aws_iam_policy.worker_nodes_ssm_access.arn
+  policy_arn = aws_iam_policy.k8s_nodes_ssm_access.arn
 }
+
+resource "aws_iam_role_policy_attachment" "ebs_csi_worker" {
+  role       = aws_iam_role.worker_nodes.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+# Attach the IAM Role to the Launch Template
+resource "aws_iam_instance_profile" "worker_nodes" {
+  name = "worker-nodes-instance-profile"
+  role = aws_iam_role.worker_nodes.name
+}
+
+
+# Master Node IAM Role
+resource "aws_iam_role" "master_node" {
+  name = "master-node-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
 # End of IAM Role
 #############################################
 
@@ -107,11 +144,7 @@ resource "aws_instance" "master-node" {
 # The ASG uses the launch template to create instances based on the desired_capacity (set to 2 in your case). 
 # It manages the lifecycle of those instances (launching, terminating, scaling) automatically.
 ##################################
-# 1. Attach the IAM Role to the Launch Template
-resource "aws_iam_instance_profile" "worker_nodes" {
-  name = "worker-nodes-instance-profile"
-  role = aws_iam_role.worker_nodes.name
-}
+
 
 # Launch Template: Defines worker node config
 resource "aws_launch_template" "worker-node" {

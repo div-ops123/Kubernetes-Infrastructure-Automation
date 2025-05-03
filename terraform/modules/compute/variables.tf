@@ -33,8 +33,3 @@ variable "control_node_sg_id" {
   type        = string
 }
 
-variable "region_name" {
-  description = "AWS Region to deploy resources to."
-  type = string
-  default = "af-south-1"
-}
